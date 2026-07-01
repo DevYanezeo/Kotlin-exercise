@@ -5,6 +5,17 @@ Humanos y asistentes de IA (Cursor, Copilot, Claude Code, etc.) deben seguir **s
 
 ---
 
+## Contexto de la app
+
+**Tengo Ansiedad** — app dummy para pacientes que registra episodios de ansiedad.
+
+- Pantalla única con contador de clicks y botón rojo **"Tengo ansiedad"**
+- Cada click llama a `RegisterAnxietyClickUseCase` e incrementa el contador
+- Sin listas, sin microservicios, sin tareas: solo contador + registro de eventos
+- Persistencia en memoria (`InMemoryAnxietyRepository`) — suficiente para la prueba
+
+---
+
 ## Plataforma
 
 Este proyecto es **Android nativo con Jetpack Compose**, no Kotlin Multiplatform (KMP).
@@ -25,7 +36,7 @@ No hay `commonMain`, `androidMain` ni `iosMain`. Si en el futuro se migra a KMP,
 | Capa | Módulo | Responsabilidad |
 |------|--------|-----------------|
 | Presentación | `:app` | UI (Compose), ViewModels, estados de pantalla |
-| Dominio | `:domain` | Modelos, interfaces de repositorio, casos de uso |
+| Dominio | `:domain` | Interfaces de repositorio y casos de uso |
 | Datos | `:data` | Implementaciones de repositorios y fuentes de datos |
 | Design System | `:design-system` | Tema, tokens y componentes reutilizables de UI |
 
@@ -60,6 +71,17 @@ Si `domain` intenta importar `data`, **el build falla**. La arquitectura no depe
 
 Motor: **Material 3** vía Jetpack Compose. Capa propia encima: `AppTheme`, `AppTypography`, `AppSpacing`, componentes `App*`.
 
+Componentes actuales del design system:
+
+| Componente | Uso |
+|------------|-----|
+| `AppTheme` | Tema global (colores, tipografía) |
+| `AppTypography` | Estilos de texto |
+| `AppSpacing` | Tokens de espaciado (`xs`, `sm`, `md`, `lg`) |
+| `AppAnxietyButton` | Botón rojo principal de la app |
+| `AppPrimaryButton` | Botón primario genérico (reutilizable) |
+| `AppCard` | Tarjeta genérica (reutilizable) |
+
 Toda UI en `:app` usa `:design-system`:
 
 ```kotlin
@@ -67,9 +89,7 @@ Toda UI en `:app` usa `:design-system`:
 Button(onClick = {}) { Text("Guardar") }
 
 // ✅ BIEN — componentes del design system
-AppTaskRow(title = "Revisar PR", isCompleted = false, onToggle = {})
-AppTextField(value = title, onValueChange = {}, label = "Nueva tarea")
-AppPrimaryButton(text = "Agregar tarea", onClick = {})
+AppAnxietyButton(text = "Tengo ansiedad", onClick = {})
 ```
 
 Colores y tipografía solo desde `AppTheme`, `MaterialTheme` o `designsystem/theme/`.
@@ -89,38 +109,37 @@ Colores y tipografía solo desde `AppTheme`, `MaterialTheme` o `designsystem/the
 
 | Tipo | Patrón | Ejemplo |
 |------|--------|---------|
-| Caso de uso | `Get<Entidad>UseCase`, `Add<Entidad>UseCase`, `Toggle<Entidad>UseCase` | `GetTasksUseCase` |
-| Interfaz repositorio | `<Entidad>Repository` | `TaskRepository` |
-| Implementación | `<Fuente><Entidad>Repository` o `<Entidad>RepositoryImpl` | `InMemoryTaskRepository` |
+| Caso de uso | `Get<Concepto>UseCase`, `Register<Concepto>UseCase` | `RegisterAnxietyClickUseCase` |
+| Interfaz repositorio | `<Concepto>Repository` | `AnxietyRepository` |
+| Implementación | `<Fuente><Concepto>Repository` o `<Concepto>RepositoryImpl` | `InMemoryAnxietyRepository` |
 
 ```kotlin
 // ❌ MAL — nombre genérico sin patrón
 class GreetingLogic(...)
 
 // ✅ BIEN
-class GetGreetingUseCase(...)
+class RegisterAnxietyClickUseCase(...)
 ```
 
 ### Presentación
 
 | Tipo | Patrón | Ejemplo |
 |------|--------|---------|
-| Estado de pantalla | `<Feature>UiState` | `TodoUiState` |
-| ViewModel | `<Feature>ViewModel` | `TodoViewModel` |
-| Pantalla Compose | `<Feature>Screen` | `TodoScreen` |
+| Estado de pantalla | `<Feature>UiState` | `AnxietyUiState` |
+| ViewModel | `<Feature>ViewModel` | `AnxietyViewModel` |
+| Pantalla Compose | `<Feature>Screen` | `AnxietyScreen` |
 
 ---
 
 ## Estructura de carpetas
 
 ```
-app/src/main/kotlin/.../presentation/<feature>/
-  <Feature>Screen.kt
-  <Feature>ViewModel.kt
-  <Feature>UiState.kt
+app/src/main/kotlin/.../presentation/anxiety/
+  AnxietyScreen.kt
+  AnxietyViewModel.kt
+  AnxietyUiState.kt
 
 domain/src/main/kotlin/.../domain/
-  model/
   repository/
   usecase/
 
@@ -132,16 +151,18 @@ design-system/src/main/kotlin/.../designsystem/
   components/
 ```
 
+> `domain/model/` solo si el dominio necesita entidades (`data class`). Esta app usa un contador `Int` vía repositorio, sin carpeta `model/`.
+
 ---
 
 ## Flujo para una feature nueva
 
-1. `domain/model/` — entidad
-2. `domain/repository/` — interfaz
-3. `domain/usecase/` — caso de uso
+1. `domain/repository/` — interfaz del repositorio
+2. `domain/usecase/` — caso(s) de uso
+3. `domain/model/` — solo si hay entidad de dominio (`data class`)
 4. `data/` — implementación del repositorio
-5. `design-system/` — componentes reutilizables (si aplica)
-6. `app/presentation/` — UiState, ViewModel, Screen
+5. `design-system/` — componentes UI reutilizables (si aplica)
+6. `app/presentation/<feature>/` — UiState, ViewModel, Screen
 7. `domain/src/test/` — test del caso de uso
 
 ---
