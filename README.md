@@ -1,187 +1,98 @@
 # Kotlin Exercise — Estandarización de proyecto
 
-Proyecto Kotlin mínimo (**Mis Tareas** — lista de tareas con agregar y marcar completadas) que demuestra **arquitectura por capas**, **design system**, **Ktlint** y **CI/CD con GitHub Actions**.
+Proyecto Kotlin mínimo (**Tengo Ansiedad**): contador de episodios para pacientes. Demuestra arquitectura por capas, design system, calidad automatizada y reglas para asistentes de IA.
 
 Autor: Eliseo
 
-## Objetivo de la prueba — ¿se cumple?
+## Qué es y qué entrega
 
-> Establecer las bases de estandarización para que cualquier desarrollador (o asistente de IA) contribuya siguiendo las mismas reglas.
+App dummy de una pantalla — contador + botón rojo "Tengo ansiedad". El foco no es la feature, sino dejar un repo donde cualquier persona (o una IA) contribuya con las mismas reglas.
 
-| Requisito | Cómo se cumple |
-|-----------|----------------|
-| CI/CD en cada push/PR | `.github/workflows/ci.yml` (fast-feedback + qa-gate) |
-| Arquitectura con capas claras | 4 módulos Gradle + dependencias enforced en build |
-| Design system obligatorio | Módulo `:design-system` con tema y componentes `App*` |
-| Convenciones y patrones | `AGENTS.md` (fuente única de verdad) |
-| Reglas para asistentes de IA | `AGENTS.md` |
-| README con decisiones | Este archivo |
-
-## Qué incluye este repositorio
-
-| Entregable | Ubicación |
-|------------|-----------|
-| Pipeline CI/CD | `.github/workflows/ci.yml` |
-| Reglas para asistentes de IA | `AGENTS.md` (única fuente de verdad) |
-| App dummy | Módulos `:app`, `:domain`, `:data`, `:design-system` |
+| Entregable | Dónde |
+|------------|-------|
+| CI/CD (push/PR) | `.github/workflows/ci.yml` |
+| Reglas para IA y devs | `AGENTS.md` |
+| App + arquitectura | `:app`, `:domain`, `:data`, `:design-system` |
 
 ## Arquitectura
 
 ```
-app (presentación)     → Compose UI, ViewModels
-design-system          → Tema, tipografía, componentes App*
-domain                 → Modelos, repositorios (interfaces), casos de uso
-data                   → Implementación de repositorios
+app            → Compose, ViewModels (presentación)
+design-system  → Tema, tokens, componentes App*
+domain         → Repositorios (interfaces), casos de uso
+data           → Implementaciones de repositorios
 ```
 
-**Clean Architecture + MVVM**: la UI observa un `StateFlow<UiState>`; la lógica vive en casos de uso del dominio; los datos se acceden solo vía interfaces de repositorio.
+**Clean Architecture + MVVM**: la UI observa `StateFlow<UiState>`; la lógica vive en casos de uso; los datos solo se acceden vía interfaces.
 
-### Android nativo (no KMP)
+Elegí **Android nativo** (no KMP): la prueba pide estandarizar un proyecto Android con Compose. KMP añadiría `commonMain`/`androidMain` sin aportar valor aquí. `:domain` y `:data` son Kotlin JVM puro; `:app` es el host Android.
 
-Intención deliberada: **app Android pura**, no Kotlin Multiplatform.
+Los límites entre capas no dependen de disciplina manual: si `domain` importa `data`, **Gradle falla**. Por eso cada capa es un módulo separado con su propio `build.gradle.kts`, en lugar de paquetes sueltos dentro de un solo módulo.
 
-- `:app` es el **host Android** (application module).
-- `:domain` y `:data` son módulos **Kotlin JVM** (`src/main/kotlin`, sin `commonMain`).
-- `:design-system` es **Android library** con Compose (requiere SDK Android).
+## Herramientas y por qué estas
 
-Esto simplifica la prueba de estandarización. Los límites entre capas se imponen igual vía Gradle. Una migración futura a KMP movería `domain`/`data` a `commonMain`.
+### Gradle + version catalog (`libs.versions.toml`)
 
-## Decisiones técnicas
+Es el build system estándar en Kotlin/Android. Centralizo versiones en un solo archivo para que CI y local usen exactamente lo mismo — sin versiones duplicadas entre módulos.
 
-### Kotlin + Gradle (Kotlin DSL)
+| Herramienta | Versión | Motivo |
+|-------------|---------|--------|
+| Kotlin | 2.1.21 | Rama estable 2.1.x |
+| AGP | 8.7.2 | Máximo fully supported con Kotlin 2.1.21 |
+| Gradle | 8.11.1 | Dentro del rango oficial para 2.1.x |
+| JDK | 17 | Requerido por AGP 8.x |
 
-- **Por qué**: es el estándar de la industria para proyectos Kotlin/Android.
-- **Version catalog** (`gradle/libs.versions.toml`): centraliza versiones de dependencias y evita duplicación entre módulos.
+No piné "la última de todo": prioricé combinación [oficialmente compatible](https://kotlinlang.org/docs/gradle-configure-project.html) y reproducible en CI.
 
-### Versiones del toolchain (estables y compatibles)
+### Design system (`:design-system`)
 
-Versiones fijadas en `gradle/libs.versions.toml` y `gradle-wrapper.properties`, alineadas con la [matriz oficial de compatibilidad](https://kotlinlang.org/docs/gradle-configure-project.html) de JetBrains:
+La prueba exige un design system para la UI. Lo aislé en módulo propio — no como paquete dentro de `:app` — para que colores, tipografía y componentes (`AppAnxietyButton`, `AppSpacing`) no se mezclen con lógica de pantalla. Material 3 es la base; encima va una capa `App*` con identidad propia.
 
-| Herramienta | Versión | Notas |
-|-------------|---------|-------|
-| Kotlin | **2.1.21** | Rama 2.1.x estable (bugfix de 2.1.20) |
-| Android Gradle Plugin | **8.7.2** | Máximo fully supported con Kotlin 2.1.21 |
-| Gradle (wrapper) | **8.11.1** | Dentro del rango soportado para Kotlin 2.1.x |
-| JDK | **17** | Requerido por AGP 8.x |
+### Ktlint + `.editorconfig`
 
-**Por qué no la última de todo**: se prioriza combinación **oficialmente compatible** y reproducible en CI, no bleeding edge. El evaluador puede verificar versiones en un solo archivo (`libs.versions.toml`).
+Ktlint cubre formato y convenciones de estilo en Kotlin. Lo integré en Gradle y CI porque el estilo no debería depender de que alguien se acuerde de formatear antes del merge. Es el equivalente práctico a ESLint + Prettier en ecosistemas JS.
 
-### Multi-módulo
+### Detekt (`config/detekt/detekt.yml`)
 
-- **Por qué**: fuerza límites entre capas en tiempo de compilación. Si `domain` importa Android, el build falla.
-- Cada capa tiene un `build.gradle.kts` propio con dependencias mínimas.
+Ktlint no detecta code smells ni complejidad. Detekt sí. Corre solo en el gate de `main` para no frenar pushes diarios a `dev`.
 
-### Jetpack Compose + módulo `design-system`
+### Tests + JaCoCo
 
-- **Por qué**: la prueba pide un design system obligatorio para la UI. Un módulo dedicado con `AppTheme`, tokens y componentes (`AppCard`, `AppPrimaryButton`) garantiza consistencia visual y evita estilos ad-hoc en pantallas.
+Tests en `:domain` (casos de uso) y `:data` (repositorio) — capas con lógica real, sin emulador. JaCoCo en `:domain` genera cobertura HTML. No usé SonarCloud: Detekt + Lint + JaCoCo cubren calidad sin cuenta externa ni tokens en GitHub.
 
-### Ktlint (`org.jlleitschuh.gradle.ktlint`)
+### GitHub Actions — dos jobs
 
-- **Por qué**: formateo y estilo automáticos, integración simple con Gradle y CI.
-- **Equivalente en JS**: ESLint + Prettier (Ktlint cubre estilo; no reemplaza análisis profundo).
-- Comandos:
-  - `./gradlew ktlintCheck` — verifica estilo (usado en CI)
-  - `./gradlew ktlintFormat` — corrige formato automáticamente
+| Job | Cuándo | Qué |
+|-----|--------|-----|
+| `fast-feedback` | Todo push/PR | Ktlint + tests `:domain` y `:data` |
+| `qa-gate` | Solo `main` | Detekt, Lint, JaCoCo, build APK |
 
-### Detekt (análisis estático)
+Un solo `gradlew build` en cada push sería más simple, pero mezclaría feedback rápido con QA pesado. Separar jobs permite iterar en `dev` sin esperar Lint ni Detekt, y garantizar que `main` siempre pasa el gate completo.
 
-- **Por qué**: detecta code smells, complejidad y malas prácticas (más allá del formato).
-- **Equivalente en JS**: ESLint con reglas de calidad.
-- Configuración: `config/detekt/detekt.yml`
-- Comando: `./gradlew detekt` (solo en QA gate hacia `main`)
+### `AGENTS.md`
 
-### Tests y cobertura
+Un solo archivo con reglas de arquitectura, design system y convenciones. Lo duplicar en varios sitios (skills, reglas de IDE, README) genera divergencia con el tiempo. El CI hace cumplir las reglas; `AGENTS.md` las explica.
 
-- Tests unitarios en `:domain` (casos de uso) y `:data` (repositorio).
-- **JaCoCo** en `:domain` genera reporte HTML/XML de cobertura.
-- Comandos:
-  - `./gradlew :domain:test :data:test`
-  - `./gradlew :domain:jacocoTestReport`
+## Ejecutar localmente
 
-### GitHub Actions — estrategia por ambiente
-
-Dos jobs en `.github/workflows/ci.yml`:
-
-| Job | Cuándo corre | Qué hace |
-|-----|--------------|----------|
-| **fast-feedback** | Todo push/PR a `dev` o `main` | Ktlint + tests `:domain` y `:data` (~rápido) |
-| **qa-gate** | Solo PR → `main` o push a `main` | Detekt, tests `:app`, JaCoCo, Android Lint, build APK |
-
-**Flujo de ramas propuesto:**
-
-```
-dev  → trabajo diario, CI rápido (sin QA pesado)
-main → producción, QA completo antes de mergear
-```
-
-Así no bloqueas a quien pushea a `dev`, pero **main siempre pasa el gate de calidad**.
-
-**Por qué Gradle Setup Action**: cache de dependencias y builds más rápidos en CI.
-
-### Calidad sin servicios externos
-
-Detekt + Ktlint + Android Lint + JaCoCo cubren estilo, análisis estático, lint de Android y cobertura **sin depender de SonarCloud ni otros SaaS**. Menos configuración para la prueba, mismo rigor en CI.
-
-### Reglas para IA
-
-- **`AGENTS.md`**: único archivo con reglas para desarrolladores y asistentes de IA (arquitectura, design system, convenciones, patrones).
-
-El CI **hace cumplir** las reglas (Ktlint, Detekt, tests, Lint). `AGENTS.md` las **documenta**.
-
-### Carpeta `config/`
-
-Configuración de herramientas de calidad, separada del código fuente:
-
-| Ruta | Herramienta | Propósito |
-|------|-------------|-----------|
-| `config/detekt/detekt.yml` | [Detekt](https://detekt.dev/) | Análisis estático (complejidad, estilo, naming) |
-| `.editorconfig` (raíz) | Ktlint | Estilo de formato (indentación, reglas Compose) |
-
-Ktlint no vive en `config/` porque lee `.editorconfig` desde la raíz por convención.
-
-## Cómo ejecutar localmente
-
-Requisitos: JDK 17+, Android SDK (para compilar `:app`).
+Requisitos: JDK 17+, Android SDK.
 
 ```bash
-./gradlew ktlintCheck
-./gradlew :domain:test :data:test
-./gradlew detekt                    # QA (antes de merge a main)
-./gradlew :domain:jacocoTestReport  # cobertura
-./gradlew assembleDebug
+./gradlew ktlintCheck :domain:test :data:test
+./gradlew detekt              # antes de merge a main
+./gradlew assembleDebug       # compilar app
 ```
 
-En Windows (PowerShell):
-
-```powershell
-.\gradlew.bat ktlintCheck
-.\gradlew.bat :domain:test :data:test
-```
-
-## Estructura de carpetas
+## Estructura
 
 ```
-Kotlin-exercise/
-├── AGENTS.md               # Reglas para devs y asistentes de IA
-├── .github/workflows/      # CI/CD
-├── config/detekt/          # Config Detekt (análisis estático)
-├── .editorconfig           # Config Ktlint (estilo)
-├── app/                    # Host Android — presentación
-├── data/                   # Kotlin JVM — datos
-├── design-system/          # Android library — UI
-├── domain/                 # Kotlin JVM — dominio
+├── AGENTS.md              # Reglas (única fuente de verdad)
+├── .github/workflows/     # CI/CD
+├── config/detekt/         # Reglas Detekt
+├── .editorconfig          # Reglas Ktlint
+├── app/                   # Presentación
+├── domain/                # Dominio (JVM)
+├── data/                  # Datos (JVM)
+├── design-system/         # UI reutilizable
 └── gradle/libs.versions.toml
 ```
-
-## Glosario rápido (si nunca usaste Kotlin)
-
-| Concepto | Qué es |
-|----------|--------|
-| **Kotlin** | Lenguaje moderno que corre en JVM/Android; sintaxis concisa y segura ante nulos |
-| **Gradle** | Herramienta de build (como npm para Node o Maven para Java) |
-| **Ktlint** | Linter/formatter de estilo para Kotlin |
-| **Detekt** | Análisis estático (code smells, complejidad) |
-| **Compose** | Framework declarativo de UI (similar a React/SwiftUI) |
-| **Use case** | Clase con una responsabilidad de negocio (`GetTasksUseCase`, `AddTaskUseCase`) |
-| **ViewModel** | Mantiene estado de pantalla y sobrevive a rotaciones |
-| **StateFlow** | Flujo reactivo de estado que la UI observa |
