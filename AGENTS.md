@@ -1,18 +1,16 @@
-# Guía para asistentes de IA y desarrolladores
+# Guía de contribución
 
-**Fuente única de verdad** para contribuir a este repositorio.  
-Humanos y asistentes de IA (Cursor, Copilot, Claude Code, etc.) deben seguir **solo este archivo**.
+Reglas para trabajar en este repositorio. Leer antes de abrir un PR o generar código nuevo.
 
 ---
 
 ## Contexto de la app
 
-**Tengo Ansiedad** — app dummy para pacientes que registra episodios de ansiedad.
+**Tengo Ansiedad** — registro de episodios de ansiedad para pacientes.
 
-- Pantalla única con contador de clicks y botón rojo **"Tengo ansiedad"**
-- Cada click llama a `RegisterAnxietyClickUseCase` e incrementa el contador
-- Sin listas, sin microservicios, sin tareas: solo contador + registro de eventos
-- Persistencia en memoria (`InMemoryAnxietyRepository`) — suficiente para la prueba
+- Pantalla única con contador y botón rojo **"Tengo ansiedad"**
+- Cada click ejecuta `RegisterAnxietyClickUseCase` e incrementa el contador
+- Persistencia en memoria (`InMemoryAnxietyRepository`) por ahora
 
 ---
 
@@ -54,7 +52,7 @@ Si `domain` intenta importar `data`, **el build falla**. La arquitectura no depe
 - MVVM (`ViewModel` + `StateFlow` / `UiState`)
 - Repository pattern
 - Use cases con `suspend operator fun invoke()`
-- Inyección manual en `MainActivity` (dummy; en producción: Hilt/Koin)
+- Inyección manual en `MainActivity` por ahora; en producción usar Hilt/Koin
 
 ### Patrones prohibidos
 
@@ -67,7 +65,7 @@ Si `domain` intenta importar `data`, **el build falla**. La arquitectura no depe
 
 ---
 
-## Design System obligatorio
+## Design System
 
 Motor: **Material 3** vía Jetpack Compose. Capa propia encima: `AppTheme`, `AppTypography`, `AppSpacing`, componentes `App*`.
 
@@ -195,7 +193,7 @@ design-system/src/main/kotlin/.../designsystem/
 
 ---
 
-## Referencias (no duplicar reglas aquí)
+## Referencias
 
-- Decisiones técnicas y CI/CD: [README.md](README.md)
+- Setup, toolchain y CI: [README.md](README.md)
 - Config Detekt: [config/detekt/detekt.yml](config/detekt/detekt.yml)

@@ -1,18 +1,14 @@
-# Kotlin Exercise — Estandarización de proyecto
+# Tengo Ansiedad
 
-Proyecto Kotlin mínimo (**Tengo Ansiedad**): contador de episodios para pacientes. Demuestra arquitectura por capas, design system, calidad automatizada y reglas para asistentes de IA.
+App Android para que pacientes registren episodios de ansiedad con un solo gesto: un contador y un botón.
 
 Autor: Eliseo
 
-## Qué es y qué entrega
+## La app
 
-App dummy de una pantalla — contador + botón rojo "Tengo ansiedad". El foco no es la feature, sino dejar un repo donde cualquier persona (o una IA) contribuya con las mismas reglas.
+Pantalla única. El paciente pulsa **"Tengo ansiedad"** y el contador sube. Sin formularios ni navegación — la interacción tiene que ser inmediata cuando lo necesitan.
 
-| Entregable | Dónde |
-|------------|-------|
-| CI/CD (push/PR) | `.github/workflows/ci.yml` |
-| Reglas para IA y devs | `AGENTS.md` |
-| App + arquitectura | `:app`, `:domain`, `:data`, `:design-system` |
+Stack: Kotlin, Jetpack Compose, Clean Architecture en módulos Gradle separados.
 
 ## Arquitectura
 
@@ -23,76 +19,76 @@ domain         → Repositorios (interfaces), casos de uso
 data           → Implementaciones de repositorios
 ```
 
-**Clean Architecture + MVVM**: la UI observa `StateFlow<UiState>`; la lógica vive en casos de uso; los datos solo se acceden vía interfaces.
+La UI observa `StateFlow<UiState>`. La lógica vive en casos de uso; los datos solo se acceden vía interfaces de repositorio.
 
-Elegí **Android nativo** (no KMP): la prueba pide estandarizar un proyecto Android con Compose. KMP añadiría `commonMain`/`androidMain` sin aportar valor aquí. `:domain` y `:data` son Kotlin JVM puro; `:app` es el host Android.
+Elegí **Android nativo** en lugar de KMP: el alcance actual es una app Android con Compose. KMP añadiría `commonMain`/`androidMain` sin beneficio claro por ahora. `:domain` y `:data` son Kotlin JVM puro; `:app` es el host.
 
-Los límites entre capas no dependen de disciplina manual: si `domain` importa `data`, **Gradle falla**. Por eso cada capa es un módulo separado con su propio `build.gradle.kts`, en lugar de paquetes sueltos dentro de un solo módulo.
+Cada capa es un módulo Gradle con su propio `build.gradle.kts`. Si `domain` intenta importar `data`, el build falla — los límites no dependen de que alguien recuerde la regla.
 
-## Herramientas y por qué estas
+## Herramientas
 
 ### Gradle + version catalog (`libs.versions.toml`)
 
-Es el build system estándar en Kotlin/Android. Centralizo versiones en un solo archivo para que CI y local usen exactamente lo mismo — sin versiones duplicadas entre módulos.
+Build system estándar en Kotlin/Android. Las versiones viven en un solo archivo para que local y CI usen lo mismo.
 
 | Herramienta | Versión | Motivo |
 |-------------|---------|--------|
 | Kotlin | 2.1.21 | Rama estable 2.1.x |
-| AGP | 8.7.2 | Máximo fully supported con Kotlin 2.1.21 |
+| AGP | 8.7.2 | Compatible con Kotlin 2.1.21 |
 | Gradle | 8.11.1 | Dentro del rango oficial para 2.1.x |
 | JDK | 17 | Requerido por AGP 8.x |
 
-No piné "la última de todo": prioricé combinación [oficialmente compatible](https://kotlinlang.org/docs/gradle-configure-project.html) y reproducible en CI.
+Prioricé combinación [oficialmente compatible](https://kotlinlang.org/docs/gradle-configure-project.html) sobre usar siempre la última versión de cada herramienta.
 
 ### Design system (`:design-system`)
 
-La prueba exige un design system para la UI. Lo aislé en módulo propio — no como paquete dentro de `:app` — para que colores, tipografía y componentes (`AppAnxietyButton`, `AppSpacing`) no se mezclen con lógica de pantalla. Material 3 es la base; encima va una capa `App*` con identidad propia.
+Colores, tipografía y componentes (`AppAnxietyButton`, `AppSpacing`) viven en módulo propio, no dentro de `:app`. Así la pantalla no acumula estilos ad-hoc. Material 3 es la base; encima va la capa `App*`.
 
 ### Ktlint + `.editorconfig`
 
-Ktlint cubre formato y convenciones de estilo en Kotlin. Lo integré en Gradle y CI porque el estilo no debería depender de que alguien se acuerde de formatear antes del merge. Es el equivalente práctico a ESLint + Prettier en ecosistemas JS.
+Formato y convenciones automáticos, integrados en Gradle y CI. El estilo no debería depender de formatear a mano antes de cada merge.
 
 ### Detekt (`config/detekt/detekt.yml`)
 
-Ktlint no detecta code smells ni complejidad. Detekt sí. Corre solo en el gate de `main` para no frenar pushes diarios a `dev`.
+Ktlint no cubre code smells ni complejidad. Detekt corre en el gate de `main`, no en cada push a `dev`.
 
 ### Tests + JaCoCo
 
-Tests en `:domain` (casos de uso) y `:data` (repositorio) — capas con lógica real, sin emulador. JaCoCo en `:domain` genera cobertura HTML. No usé SonarCloud: Detekt + Lint + JaCoCo cubren calidad sin cuenta externa ni tokens en GitHub.
+Tests en `:domain` y `:data` — lógica de negocio sin emulador. JaCoCo genera cobertura HTML en `:domain`. Descarté SonarCloud: Detekt + Android Lint + JaCoCo cubren lo necesario sin servicio externo.
 
-### GitHub Actions — dos jobs
+### GitHub Actions
 
 | Job | Cuándo | Qué |
 |-----|--------|-----|
 | `fast-feedback` | Todo push/PR | Ktlint + tests `:domain` y `:data` |
 | `qa-gate` | Solo `main` | Detekt, Lint, JaCoCo, build APK |
 
-Un solo `gradlew build` en cada push sería más simple, pero mezclaría feedback rápido con QA pesado. Separar jobs permite iterar en `dev` sin esperar Lint ni Detekt, y garantizar que `main` siempre pasa el gate completo.
+Un solo `gradlew build` en cada push es más simple, pero mezcla feedback rápido con QA pesado. Dos jobs permiten iterar en `dev` sin esperar Lint ni Detekt.
 
 ### `AGENTS.md`
 
-Un solo archivo con reglas de arquitectura, design system y convenciones. Lo duplicar en varios sitios (skills, reglas de IDE, README) genera divergencia con el tiempo. El CI hace cumplir las reglas; `AGENTS.md` las explica.
+Reglas de arquitectura, design system y convenciones en un solo archivo. Duplicarlas en README, skills o reglas de IDE genera divergencia. El CI las hace cumplir; `AGENTS.md` las documenta.
 
 ## Ejecutar localmente
 
-Requisitos: JDK 17+, Android SDK.
+JDK 17+ y Android SDK.
 
 ```bash
 ./gradlew ktlintCheck :domain:test :data:test
 ./gradlew detekt              # antes de merge a main
-./gradlew assembleDebug       # compilar app
+./gradlew assembleDebug
 ```
 
-## Estructura
+## Estructura del repo
 
 ```
-├── AGENTS.md              # Reglas (única fuente de verdad)
+├── AGENTS.md              # Convenciones de contribución
 ├── .github/workflows/     # CI/CD
-├── config/detekt/         # Reglas Detekt
-├── .editorconfig          # Reglas Ktlint
-├── app/                   # Presentación
-├── domain/                # Dominio (JVM)
-├── data/                  # Datos (JVM)
-├── design-system/         # UI reutilizable
+├── config/detekt/
+├── .editorconfig
+├── app/
+├── domain/
+├── data/
+├── design-system/
 └── gradle/libs.versions.toml
 ```
