@@ -6,35 +6,31 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.eliseo.kotlinexercise.data.repository.InMemoryTaskRepository
+import com.eliseo.kotlinexercise.data.repository.InMemoryAnxietyRepository
 import com.eliseo.kotlinexercise.designsystem.theme.AppTheme
-import com.eliseo.kotlinexercise.domain.usecase.AddTaskUseCase
-import com.eliseo.kotlinexercise.domain.usecase.GetTasksUseCase
-import com.eliseo.kotlinexercise.domain.usecase.ToggleTaskUseCase
-import com.eliseo.kotlinexercise.presentation.todo.TodoScreen
-import com.eliseo.kotlinexercise.presentation.todo.TodoViewModel
+import com.eliseo.kotlinexercise.domain.usecase.GetAnxietyClickCountUseCase
+import com.eliseo.kotlinexercise.domain.usecase.RegisterAnxietyClickUseCase
+import com.eliseo.kotlinexercise.presentation.anxiety.AnxietyScreen
+import com.eliseo.kotlinexercise.presentation.anxiety.AnxietyViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val repository = InMemoryTaskRepository()
+        val repository = InMemoryAnxietyRepository()
         val viewModel =
-            TodoViewModel(
-                getTasksUseCase = GetTasksUseCase(repository),
-                addTaskUseCase = AddTaskUseCase(repository),
-                toggleTaskUseCase = ToggleTaskUseCase(repository),
+            AnxietyViewModel(
+                getAnxietyClickCountUseCase = GetAnxietyClickCountUseCase(repository),
+                registerAnxietyClickUseCase = RegisterAnxietyClickUseCase(repository),
             )
 
         setContent {
             AppTheme {
                 val uiState by viewModel.uiState.collectAsState()
-                TodoScreen(
+                AnxietyScreen(
                     uiState = uiState,
-                    onNewTaskTitleChange = viewModel::onNewTaskTitleChange,
-                    onAddTask = viewModel::addTask,
-                    onToggleTask = viewModel::toggleTask,
+                    onAnxietyClick = viewModel::onAnxietyClick,
                 )
             }
         }
